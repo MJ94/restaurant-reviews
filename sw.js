@@ -43,17 +43,36 @@ self.addEventListener('activate', event => {
     }));
 });
 
+// Adapted from https://developers.google.com/web/fundamentals/primers/service-workers/
 self.addEventListener('fetch', event => {
-    console.log('serviceWorker fetching for offline');
-    event.respondWith(
-        caches.match(event.request).then(response => {
-            if (response) {
-                console.log(`Found content in cache`);
-                return response;
-            } else {
-                console.log(`Could not find content in cache, fetching now.`);
-                return fetch(event.request);
+  console.log("serviceWorker fetching for offline");
+  event.respondWith(
+    caches.match(event.request)
+      .then(response => {
+        // Cache hit - return response
+        if (response) {
+          return response;
+        }
+
+        const fetchRequest = event.request.clone();
+
+        return fetch(fetchRequest).then(
+          response => {
+            // Check if we received a valid response
+            if(!response || response.status !== 200 || response.type !== 'basic') {
+              return response;
             }
-        })
+
+            const responseToCache = response.clone();
+
+            caches.open(cacheVersion)
+              .then(cache => {
+                cache.put(event.request, responseToCache);
+              });
+
+            return response;
+          }
+        );
+      })
     );
 });
